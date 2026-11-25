@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+  <meta charset="UTF-8">
+  <title>六小豆 · 桌面陪伴</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    html,
+    body {
+      width: 100%;
+      height: 100%;
+      background: transparent;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "HarmonyOS Sans SC", "Microsoft YaHei UI", sans-serif;
+    }
+
+    .stage {
+      width: 260px;
+      height: 280px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-end;
+      padding-bottom: 26px;
+    }
+
+    /* 顶部治愈暗色玉石气泡（无 backdrop-filter，杜绝透明窗口白框） */
+    .bubble {
+      position: absolute;
+      top: 8px;
+      left: 50%;
+      transform: translateX(-50%) translateY(6px) scale(0.94);
+      background: rgba(12, 18, 24, 0.94);
+      border: 1px solid rgba(110, 231, 183, 0.34);
+      box-shadow:
+        0 8px 20px rgba(0, 0, 0, 0.36),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+      color: #e6f6ef;
+      font-size: 11.5px;
+      font-weight: 500;
+      letter-spacing: 0.2px;
+      line-height: 1.48;
+      padding: 7px 13px;
+      border-radius: 14px;
+      width: max-content;
+      max-width: 236px;
+      text-align: left;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.28s ease, transform 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 20;
+    }
+
+    .bubble.show {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0) scale(1);
+    }
+
+    .bubble-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #6ee7b7;
+      box-shadow: 0 0 8px #34d399;
+      flex-shrink: 0;
+    }
+
+    .bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -5px;
+      left: 50%;
+      transform: translateX(-50%) rotate(45deg);
+      width: 9px;
+      height: 9px;
+      background: rgba(12, 18, 24, 0.94);
+      border-right: 1px solid rgba(110, 231, 183, 0.34);
+      border-bottom: 1px solid rgba(110, 231, 183, 0.34);
+    }
+
+    /* 主画布容器 */
+    #canvas-wrap {
+      position: relative;
+      width: 216px;
+      height: 216px;
+      cursor: grab;
+      z-index: 10;
+    }
+
+    #canvas-wrap:active {
+      cursor: grabbing;
+    }
+
+    #pet-canvas {
+      width: 216px;
+      height: 216px;
+      display: block;
+    }
+
+    /* 底部悬浮控制胶囊（纯矢量 SVG 图标，与主界面暗黑翠玉风格统一） */
+    .dock-pill {
+      position: absolute;
+      bottom: 6px;
+      left: 50%;
+      transform: translateX(-50%) translateY(5px);
+      display: flex;
+      align-items: center;
+      gap: 3px;
+      background: rgba(12, 18, 24, 0.92);
+      padding: 3.5px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(110, 231, 183, 0.26);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+      opacity: 0;
+      pointer-events: none;
+      transition: all 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+      z-index: 30;
+    }
+
+    .stage:hover .dock-pill {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(-50%) translateY(0);
+    }
+
+    .dock-btn {
+      font-size: 11px;
+      font-weight: 500;
+      color: #cbd5e1;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      transition: all 0.15s ease;
+      white-space: nowrap;
+    }
+
+    .dock-btn svg {
+      width: 12px;
+      height: 12px;
+      stroke: currentColor;
+      fill: none;
+      stroke-width: 2;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .dock-btn:hover {
+      background: rgba(110, 231, 183, 0.14);
+      color: #6ee7b7;
+    }
+
+    .dock-btn.active {
+      color: #6ee7b7;
+    }
+
+    .dock-btn.close:hover {
+      background: rgba(244, 63, 94, 0.18);
+      color: #fda4af;
+    }
+
+    .divider {
+      width: 1px;
+      height: 11px;
+      background: rgba(255, 255, 255, 0.1);
+      margin: 0 1px;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="stage" id="stage">
+    <!-- 顶部轻语气泡 -->
+    <div class="bubble show" id="bubble" onclick="nextQuote()">
+      <span class="bubble-dot"></span>
+      <span id="bubble-text">把紧绷的肩膀放下来，我在听。</span>
+    </div>
+
+    <!-- 角色画布 -->
+    <div id="canvas-wrap" onclick="handlePetClick(event)" ondblclick="openMainWindow()">
+      <canvas id="pet-canvas"></canvas>
+    </div>
+
+    <!-- 底部控制胶囊 -->
+    <div class="dock-pill">
+      <div class="dock-btn" onclick="openMainWindow()" title="打开六本豆主窗口">
+        <svg viewBox="0 0 24 24">
+          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+        <span>倾诉</span>
+      </div>
+      <div class="divider"></div>
+      <div class="dock-btn" onclick="toggleSleep()" id="sleepBtn" title="切换小憩模式">
+        <svg viewBox="0 0 24 24">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+        <span id="sleepText">小憩</span>
+      </div>
+      <div class="divider"></div>
+      <div class="dock-btn active" onclick="togglePin()" id="pinBtn" title="切换置顶">
+        <svg viewBox="0 0 24 24">
+          <line x1="12" y1="17" x2="12" y2="22" />
+          <path
+            d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z" />
+        </svg>
+      </div>
+      <div class="dock-btn close" onclick="minimizePet()" title="隐藏桌宠">
+        <svg viewBox="0 0 24 24">
+          <line x1="18" y1="6" x2="6" y2="18" />
+          <line x1="6" y1="6" x2="18" y2="18" />
+        </svg>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('pet-canvas');
+    const ctx = canvas.getContext('2d');
+    const wrap = document.getElementById('canvas-wrap');
+    const bubble = document.getElementById('bubble');
+    const bubbleText = document.getElementById('bubble-text');
+
+    // 高分屏清晰度适配
+    const CSS_SIZE = 216;
+    const LOGICAL = 300;
+    const DPR = Math.max(2, window.devicePixelRatio || 2);
+    canvas.width = Math.round(CSS_SIZE * DPR);
+    canvas.height = Math.round(CSS_SIZE * DPR);
+    const BASE_SCALE = canvas.width / LOGICAL;
+
+    const quotes = [
+      "把紧绷的肩膀放下来，我在听。",
+      "不用急着讲道理，先照顾好心情。",
+      "累了就停下来发会儿呆，我陪着你。",
+      "你已经扛了很多事，可以松一口气了。",
+      "喝口温水吧，今天不必讨好所有人。",
+      "有难受的话双击我，我们慢慢拆开聊。",
+      "允许自己今天什么都不想做。",
+      "不管别人怎么看，我站你这边。"
+    ];
+
+    let quoteIndex = 0;
+    let bubbleTimer = null;
+
+    function showBubble(text, duration = 4200) {
+      bubbleText.textContent = text;
+      bubble.classList.add('show');
+      if (bubbleTimer) clearTimeout(bubbleTimer);
+      bubbleTimer = setTimeout(() => {
+        bubble.classList.remove('show');
+      }, duration);
+    }
+
+    function nextQuote() {
+      quoteIndex = (quoteIndex + 1) % quotes.length;
+      showBubble(quotes[quoteIndex]);
+    }
+
+    // 交互与物理状态
+    let scaleX = 1.0, scaleY = 1.0;
+    let velX = 0.0, velY = 0.0;
+    let lookX = 0, lookY = 0;
+    let targetLookX = 0, targetLookY = 0;
+    let isHovered = false;
+    let isHappy = false;
+    let isSleeping = false;
+    let happyTimer = null;
+    let blink = 1.0;
+
+    // 浮游微光与互动粒子（纯 Canvas 渲染）
+    const particles = [];
+    const fireflies = Array.from({ length: 6 }, (_, i) => ({
+      angle: (i * Math.PI * 2) / 6,
+      radius: 84 + (i % 2) * 12,
+      speed: 0.008 + (i % 3) * 0.003,
+      yOffset: (i - 2.5) * 14,
+      size: 2.2 + (i % 2) * 1.1,
+      phase: i * 1.3
+    }));
+
+    function spawnBurst() {
+      const types = ['heart', 'star', 'leaf'];
+      for (let i = 0; i < 7; i++) {
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 1.6;
+        const speed = 1.5 + Math.random() * 1.5;
+        particles.push({
+          x: 150 + (Math.random() - 0.5) * 60,
+          y: 110 + (Math.random() - 0.5) * 24,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed - 0.7,
+          size: 6.5 + Math.random() * 3.5,
+          alpha: 1,
+          rot: (Math.random() - 0.5) * 0.6,
+          type: types[i % types.length],
+          color: i % 2 === 0 ? '#6ee7b7' : '#fda4af'
+        });
+      }
+    }
+
+    wrap.addEventListener('mouseenter', () => { isHovered = true; });
+    wrap.addEventListener('mouseleave', () => {
+      isHovered = false;
+      targetLookX = 0;
+      targetLookY = 0;
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (isSleeping) return;
+      const rect = wrap.getBoundingClientRect();
+      const cx = rect.left + rect.width / 2;
+      const cy = rect.top + rect.height / 2;
+      targetLookX = Math.max(-1, Math.min(1, (e.clientX - cx) / 110));
+      targetLookY = Math.max(-1, Math.min(1, (e.clientY - cy) / 110));
+    });
+
+    // 自然眨眼（偶尔双眨眼）
+    setInterval(() => {
+      if (isHappy || isSleeping) return;
+      blink = 0.06;
+      setTimeout(() => {
+        blink = 1.0;
+        if (Math.random() < 0.35) {
+          setTimeout(() => {
+            blink = 0.06;
+            setTimeout(() => { blink = 1.0; }, 110);
+          }, 140);
+        }
+      }, 3400);
+    }, 3400);
+
+    // 拖拽窗口支持
+    let dragging = false, moved = false, downX = 0, downY = 0;
+    wrap.addEventListener('mousedown', (e) => {
+      if (e.button !== 0) return;
+      dragging = true;
+      moved = false;
+      downX = e.screenX;
+      downY = e.screenY;
+      if (window.liubendou && window.liubendou.petDragStart) {
+        window.liubendou.petDragStart();
+      }
+    });
+    window.addEventListener('mousemove', (e) => {
+      if (!dragging) return;
+      if (!moved && Math.hypot(e.screenX - downX, e.screenY - downY) > 4) {
+        moved = true;
+      }
+      if (moved && window.liubendou && window.liubendou.petDragMove) {
+        window.liubendou.petDragMove(e.screenX - downX, e.screenY - downY);
+      }
+    });
+    window.addEventListener('mouseup', () => { dragging = false; });
+
+    function handlePetClick() {
+      if (moved) {
+        moved = false;
+        return;
+      }
+      if (isSleeping) {
+        isSleeping = false;
+        document.getElementById('sleepBtn').classList.remove('active');
+      }
+      velX = 0.24;
+      velY = -0.22;
+      isHappy = true;
+      if (happyTimer) clearTimeout(happyTimer);
+      happyTimer = setTimeout(() => { isHappy = false; }, 1100);
+      spawnBurst();
+      nextQuote();
+    }
+
+    function toggleSleep() {
+      isSleeping = !isSleeping;
+      const btn = document.getElementById('sleepBtn');
+      btn.classList.toggle('active', isSleeping);
+      if (isSleeping) {
+        targetLookX = 0;
+        targetLookY = 0;
+        showBubble("小豆先咪一会儿，有事随时叫我。", 3200);
+      } else {
+        velX = -0.15;
+        velY = 0.18;
+        showBubble("睡饱啦！随时准备听你倾诉~", 3200);
+      }
+    }
+
+    // 绘制带软萌猫耳的糯米豆团一体轮廓（耳朵与胖脸颊无缝连体）
+    function traceMochiCatBody(ctx) {
+      ctx.beginPath();
+      // 头顶正中
+      ctx.moveTo(-18, -62);
+      ctx.quadraticCurveTo(0, -65, 18, -62);
+      // 右侧圆润小猫耳
+      ctx.bezierCurveTo(28, -84, 52, -84, 54, -56);
+      // 右上额头 -> 右侧丰满Q弹脸颊
+      ctx.bezierCurveTo(70, -36, 78, -6, 75, 22);
+      // 右下脸颊 -> 圆润底部
+      ctx.bezierCurveTo(72, 54, 46, 68, 0, 68);
+      // 底部 -> 左下丰满Q弹脸颊
+      ctx.bezierCurveTo(-46, 68, -72, 54, -75, 22);
+      // 左侧脸颊 -> 左上额头
+      ctx.bezierCurveTo(-78, -6, -70, -36, -54, -56);
+      // 左侧圆润小猫耳
+      ctx.bezierCurveTo(-52, -84, -28, -84, -18, -62);
+      ctx.closePath();
+    }
+
+    // 绘制矢量小粒子
+    function drawParticle(ctx, p) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.globalAlpha = Math.max(0, p.alpha);
+      ctx.fillStyle = p.color;
+
+      const s = p.size;
+      if (p.type === 'heart') {
+        ctx.beginPath();
+        ctx.moveTo(0, -s * 0.25);
+        ctx.bezierCurveTo(-s * 0.55, -s * 0.85, -s * 1.1, -s * 0.1, 0, s * 0.75);
+        ctx.bezierCurveTo(s * 1.1, -s * 0.1, s * 0.55, -s * 0.85, 0, -s * 0.25);
+        ctx.fill();
+      } else if (p.type === 'star') {
+        ctx.beginPath();
+        for (let i = 0; i < 4; i++) {
+          const a = (i * Math.PI) / 2;
+          const aMid = a + Math.PI / 4;
+          if (i === 0) ctx.moveTo(Math.cos(a) * s, Math.sin(a) * s);
+          else ctx.lineTo(Math.cos(a) * s, Math.sin(a) * s);
+          ctx.lineTo(Math.cos(aMid) * (s * 0.32), Math.sin(aMid) * (s * 0.32));
+        }
+        ctx.closePath();
+        ctx.fill();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(0, -s);
+        ctx.quadraticCurveTo(s * 0.8, 0, 0, s);
+        ctx.quadraticCurveTo(-s * 0.8, 0, 0, -s);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    let t = 0;
+    function render() {
+      t += 0.032;
+      ctx.setTransform(BASE_SCALE, 0, 0, BASE_SCALE, 0, 0);
+      ctx.clearRect(0, 0, LOGICAL, LOGICAL);
+
+      // 视线平滑插值
+      lookX += (targetLookX - lookX) * 0.14;
+      lookY += (targetLookY - lookY) * 0.14;
+
+      // 弹簧果冻物理
+      velX += (1.0 - scaleX) * 0.2;
+      velY += (1.0 - scaleY) * 0.2;
+      velX *= 0.8;
+      velY *= 0.8;
+      scaleX += velX;
+      scaleY += velY;
+
+      const breatheSpeed = isSleeping ? 0.6 : 1.15;
+      const breatheAmp = isSleeping ? 0.03 : 0.02;
+      const breathe = Math.sin(t * breatheSpeed) * breatheAmp;
+      const sx = scaleX * (1 + breathe);
+      const sy = scaleY * (1 - breathe);
+
+      const floatY = isSleeping ? 2 : Math.sin(t * 0.9) * 3.2;
+      const cx = 150;
+      const cy = 168 + floatY;
+
+      // 1. 底部柔和阴影与治愈光环
+      ctx.save();
+      const shadowScale = 1 - floatY * 0.015;
+      const shadowGrad = ctx.createRadialGradient(cx, 246, 4, cx, 246, 68 * shadowScale);
+      shadowGrad.addColorStop(0, 'rgba(6, 78, 59, 0.42)');
+      shadowGrad.addColorStop(0.55, 'rgba(16, 185, 129, 0.18)');
+      shadowGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+      ctx.fillStyle = shadowGrad;
+      ctx.beginPath();
+      ctx.ellipse(cx, 246, 64 * shadowScale, 14 * shadowScale, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 2. 环绕萤火微光粒子（后景）
+      fireflies.forEach((f) => {
+        f.angle += f.speed;
+        const fx = cx + Math.cos(f.angle) * f.radius;
+        const fy = cy + f.yOffset + Math.sin(f.angle * 1.5 + f.phase) * 10;
+        const z = Math.sin(f.angle);
+        if (z < 0) {
+          ctx.save();
+          const alpha = 0.25 + 0.25 * Math.sin(t * 2 + f.phase);
+          ctx.fillStyle = `rgba(110, 231, 183, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(fx, fy, f.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      });
+
+      // 3. 角色主体绘制
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.scale(sx, sy);
+
+      const tilt = isSleeping ? -0.04 : lookX * 0.07 + (isHovered ? Math.sin(t * 2) * 0.02 : 0);
+      ctx.rotate(tilt);
+
+      // 3.0 身后轻轻摇晃的小团尾
+      ctx.save();
+      const tailWag = isSleeping ? 0.1 : Math.sin(t * 2.6) * 0.22 + (isHappy ? Math.sin(t * 12) * 0.35 : 0);
+      ctx.translate(58, 48);
+      ctx.rotate(tailWag);
+      ctx.fillStyle = '#a7f3d0';
+      ctx.strokeStyle = '#065f46';
+      ctx.lineWidth = 2.4;
+      ctx.beginPath();
+      ctx.arc(8, 0, 10, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // 3.1 小短脚（糯米团底部的两个软萌小肉垫）
+      [-1, 1].forEach((dir) => {
+        ctx.save();
+        const footX = dir * 28;
+        const footY = 64;
+        ctx.translate(footX, footY);
+        ctx.rotate(dir * 0.12);
+        const footGrad = ctx.createRadialGradient(0, -2, 1, 0, 0, 14);
+        footGrad.addColorStop(0, '#ffffff');
+        footGrad.addColorStop(1, '#86efac');
+        ctx.fillStyle = footGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 13.5, 8.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = 2.2;
+        ctx.strokeStyle = '#065f46';
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // 3.2 连体猫耳糯米豆身（多层温润奶玉光泽渐变）
+      ctx.save();
+      traceMochiCatBody(ctx);
+
+      const bodyGrad = ctx.createRadialGradient(
+        -20 + lookX * 12,
+        -28 + lookY * 10,
+        12,
+        0,
+        8,
+        94
+      );
+      bodyGrad.addColorStop(0, '#ffffff');
+      bodyGrad.addColorStop(0.38, '#f4fcf8');
+      bodyGrad.addColorStop(0.74, '#d1fae5');
+      bodyGrad.addColorStop(0.93, '#86efac');
+      bodyGrad.addColorStop(1, '#34d399');
+      ctx.fillStyle = bodyGrad;
+      ctx.fill();
+
+      // 身体内部装饰（裁剪在身体内部，注意随后重新 traceMochiCatBody 再描边）
+      ctx.save();
+      ctx.clip();
+
+      // 底部温润环境内阴影
+      const bottomShade = ctx.createLinearGradient(0, 18, 0, 72);
+      bottomShade.addColorStop(0, 'rgba(52, 211, 153, 0)');
+      bottomShade.addColorStop(1, 'rgba(16, 185, 129, 0.26)');
+      ctx.fillStyle = bottomShade;
+      ctx.fillRect(-85, 18, 170, 60);
+
+      // 左右猫耳内的蜜桃粉嫩耳窝
+      [-1, 1].forEach((dir) => {
+        ctx.save();
+        ctx.translate(dir * 36, -60);
+        ctx.rotate(dir * 0.36);
+        const earGrad = ctx.createLinearGradient(0, -12, 0, 10);
+        earGrad.addColorStop(0, 'rgba(251, 113, 133, 0.62)');
+        earGrad.addColorStop(1, 'rgba(253, 164, 175, 0.15)');
+        ctx.fillStyle = earGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 8.5, 11, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      });
+
+      // 额头虎斑豆印（三条温柔的浅抹茶小圆纹）
+      ctx.fillStyle = 'rgba(16, 185, 129, 0.22)';
+      ctx.beginPath();
+      ctx.roundRect(-2.5 + lookX * 5, -52 + lookY * 3, 5, 11, 2.5);
+      ctx.roundRect(-11 + lookX * 5, -49 + lookY * 3, 4.2, 8.5, 2.1);
+      ctx.roundRect(6.8 + lookX * 5, -49 + lookY * 3, 4.2, 8.5, 2.1);
+      ctx.fill();
+
+      // 左上角柔光高光（纯亮斑，绝不描边！）
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.78)';
+      ctx.beginPath();
+      ctx.ellipse(-28, -36, 14, 6.5, -0.48, 0, Math.PI * 2);
+      ctx.fill();
+
+      // 肚皮上的奶白色软绒肚兜
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.68)';
+      ctx.beginPath();
+      ctx.ellipse(lookX * 4, 32 + lookY * 2, 36, 23, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore(); // 结束身体 clip
+
+      // 重新构建身体轮廓路径并描边（避免子路径污染！）
+      traceMochiCatBody(ctx);
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#065f46';
+      ctx.stroke();
+      ctx.restore();
+
+      // 3.3 胸前治愈金色小铃铛与翠绿项圈（点亮角色视觉重心）
+      ctx.save();
+      const collarY = 21 + lookY * 3;
+      // 翠绿微笑项圈带
+      ctx.beginPath();
+      ctx.moveTo(-26 + lookX * 4, collarY - 2);
+      ctx.quadraticCurveTo(lookX * 6, collarY + 7, 26 + lookX * 4, collarY - 2);
+      ctx.lineWidth = 4.2;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#059669';
+      ctx.stroke();
+
+      // 金色小铃铛
+      const bellX = lookX * 6;
+      const bellY = collarY + 5;
+      const bellGrad = ctx.createRadialGradient(bellX - 2, bellY - 2, 1, bellX, bellY, 7.5);
+      bellGrad.addColorStop(0, '#fef9c3');
+      bellGrad.addColorStop(0.55, '#facc15');
+      bellGrad.addColorStop(1, '#ca8a04');
+      ctx.fillStyle = bellGrad;
+      ctx.beginPath();
+      ctx.arc(bellX, bellY, 6.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.lineWidth = 1.6;
+      ctx.strokeStyle = '#713f12';
+      ctx.stroke();
+
+      // 铃铛十字小孔
+      ctx.fillStyle = '#713f12';
+      ctx.beginPath();
+      ctx.arc(bellX, bellY + 1.5, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(bellX - 4.5, bellY - 0.5);
+      ctx.lineTo(bellX + 4.5, bellY - 0.5);
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+      ctx.restore();
+
+      // 3.4 头顶灵魂双叶小豆芽（灵动摇曳）
+      ctx.save();
+      const sproutX = lookX * 6;
+      const sproutY = -63 + lookY * 3;
+      ctx.translate(sproutX, sproutY);
+      const sproutSway = Math.sin(t * 1.8) * 0.09 + lookX * 0.16 + (isHappy ? Math.sin(t * 12) * 0.22 : 0);
+      ctx.rotate(sproutSway);
+
+      // 豆芽嫩茎
+      ctx.beginPath();
+      ctx.moveTo(0, 1);
+      ctx.quadraticCurveTo(2, -10, 0, -18);
+      ctx.lineWidth = 3.2;
+      ctx.lineCap = 'round';
+      ctx.strokeStyle = '#065f46';
+      ctx.stroke();
+
+      // 左叶片（饱满水滴叶）
+      ctx.save();
+      ctx.translate(0, -17);
+      ctx.rotate(-0.45 - Math.sin(t * 2.1) * 0.06);
+      const leafGradL = ctx.createLinearGradient(0, 0, -20, -10);
+      leafGradL.addColorStop(0, '#10b981');
+      leafGradL.addColorStop(1, '#6ee7b7');
+      ctx.fillStyle = leafGradL;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-7, -12, -21, -10, -21, -1.5);
+      ctx.bezierCurveTo(-21, 7, -7, 7, 0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = '#065f46';
+      ctx.stroke();
+      ctx.restore();
+
+      // 右叶片（饱满水滴叶）
+      ctx.save();
+      ctx.translate(0, -17);
+      ctx.rotate(0.42 + Math.sin(t * 2.1) * 0.06);
+      const leafGradR = ctx.createLinearGradient(0, 0, 18, -9);
+      leafGradR.addColorStop(0, '#10b981');
+      leafGradR.addColorStop(1, '#a7f3d0');
+      ctx.fillStyle = leafGradR;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(6, -11, 19, -9, 19, -1);
+      ctx.bezierCurveTo(19, 6.5, 6, 6.5, 0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.lineWidth = 1.8;
+      ctx.strokeStyle = '#065f46';
+      ctx.stroke();
+      ctx.restore();
+      ctx.restore();
+
+      // 3.5 黄金幼态五官布局
+      const faceX = lookX * 10;
+      const faceY = -2 + lookY * 7;
+
+      // 蜜桃腮红（柔和珊瑚粉渐变 + 斜线萌印）
+      [-1, 1].forEach((dir) => {
+        const bx = faceX + dir * 43;
+        const by = faceY + 9;
+        ctx.save();
+        const blushGrad = ctx.createRadialGradient(bx, by, 1, bx, by, 16);
+        const alpha = isHappy ? 0.72 : 0.52;
+        blushGrad.addColorStop(0, `rgba(251, 113, 133, ${alpha})`);
+        blushGrad.addColorStop(0.65, `rgba(251, 113, 133, ${alpha * 0.45})`);
+        blushGrad.addColorStop(1, 'rgba(251, 113, 133, 0)');
+        ctx.fillStyle = blushGrad;
+        ctx.beginPath();
+        ctx.ellipse(bx, by, 16, 10, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 害羞/开心双斜线
+        ctx.strokeStyle = isHappy ? 'rgba(244, 63, 94, 0.6)' : 'rgba(244, 63, 94, 0.32)';
+        ctx.lineWidth = 1.5;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(bx - 3, by - 2);
+        ctx.lineTo(bx - 5, by + 2.8);
+        ctx.moveTo(bx + 2, by - 2);
+        ctx.lineTo(bx, by + 2.8);
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // 眼睛绘制
+      const eyeSpacing = 27;
+      const eyeY = faceY - 2;
+
+      if (isSleeping) {
+        // 酣睡闭眼弧线 ( ∪   ∪ )
+        [-1, 1].forEach((dir) => {
+          const ex = faceX + dir * eyeSpacing;
+          ctx.save();
+          ctx.strokeStyle = '#132a23';
+          ctx.lineWidth = 3.0;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.arc(ex, eyeY - 1, 8.5, Math.PI * 0.15, Math.PI * 0.85);
+          ctx.stroke();
+          ctx.restore();
+        });
+      } else if (isHappy || blink < 0.15) {
+        // 弯弯笑眼弧线 ( ◜   ◝ )
+        [-1, 1].forEach((dir) => {
+          const ex = faceX + dir * eyeSpacing;
+          ctx.save();
+          ctx.strokeStyle = '#132a23';
+          ctx.lineWidth = 3.2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          if (isHappy) {
+            ctx.arc(ex, eyeY + 4, 8.5, Math.PI * 1.15, Math.PI * 1.85);
+          } else {
+            ctx.moveTo(ex - 8, eyeY);
+            ctx.lineTo(ex + 8, eyeY);
+          }
+          ctx.stroke();
+          ctx.restore();
+        });
+      } else {
+        // 晶莹宝石大眼睛
+        [-1, 1].forEach((dir) => {
+          const ex = faceX + dir * eyeSpacing;
+          ctx.save();
+          ctx.translate(ex, eyeY);
+
+          // 眼眶深色基底
+          ctx.fillStyle = '#111c24';
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 10, 11.6, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 下半部翡翠虹膜透光月牙
+          ctx.save();
+          ctx.beginPath();
+          ctx.ellipse(0, 0, 10, 11.6, 0, 0, Math.PI * 2);
+          ctx.clip();
+          const irisGrad = ctx.createRadialGradient(0, 6, 1, 0, 5, 9.5);
+          irisGrad.addColorStop(0, '#6ee7b7');
+          irisGrad.addColorStop(0.65, '#10b981');
+          irisGrad.addColorStop(1, 'rgba(16, 185, 129, 0)');
+          ctx.fillStyle = irisGrad;
+          ctx.beginPath();
+          ctx.ellipse(0, 5.2, 8.8, 6.8, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+
+          // 左上大颗饱满眼神高光
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.ellipse(-3.3 + lookX * 1.2, -3.9 + lookY * 1.2, 3.8, 4.4, -0.2, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 右下清透小高光点
+          ctx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+          ctx.beginPath();
+          ctx.arc(3.6, 4.0, 1.9, 0, Math.PI * 2);
+          ctx.fill();
+
+          // 柔和可爱小眉毛
+          ctx.strokeStyle = 'rgba(6, 95, 70, 0.52)';
+          ctx.lineWidth = 1.9;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.arc(0, -4.5, 9.2, Math.PI * 1.25, Math.PI * 1.75);
+          ctx.stroke();
+
+          ctx.restore();
+        });
+      }
+
+      // 3.6 小巧治愈猫咪嘴巴（紧邻双眼中央偏下）
+      ctx.save();
+      const mx = faceX;
+      const my = faceY + 4;
+      ctx.strokeStyle = '#132a23';
+      ctx.lineWidth = 2.4;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (isSleeping) {
+        const sleepMouthR = 2.4 + Math.sin(t * 1.2) * 0.5;
+        ctx.fillStyle = '#fda4af';
+        ctx.beginPath();
+        ctx.arc(mx, my + 2, sleepMouthR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (isHappy) {
+        // 开心张嘴笑 D 形嘴（重新构造路径后再描边，确保舌头不带黑框！）
+        const traceMouth = () => {
+          ctx.beginPath();
+          ctx.moveTo(mx - 7, my - 0.5);
+          ctx.quadraticCurveTo(mx, my + 0.5, mx + 7, my - 0.5);
+          ctx.bezierCurveTo(mx + 7, my + 9.5, mx - 7, my + 9.5, mx - 7, my - 0.5);
+          ctx.closePath();
+        };
+        traceMouth();
+        ctx.fillStyle = '#be123c';
+        ctx.fill();
+
+        ctx.save();
+        ctx.clip();
+        ctx.fillStyle = '#fda4af';
+        ctx.beginPath();
+        ctx.ellipse(mx, my + 6.8, 5.5, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        traceMouth();
+        ctx.stroke();
+      } else {
+        // 温柔精致的猫咪 ω 微抿嘴 + 粉嫩小鼻尖
+        ctx.fillStyle = '#fb7185';
+        ctx.beginPath();
+        ctx.ellipse(mx, my - 2.5, 2.2, 1.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(mx - 6.2, my + 0.5);
+        ctx.quadraticCurveTo(mx - 3.1, my + 4.5, mx, my + 1.0);
+        ctx.quadraticCurveTo(mx + 3.1, my + 4.5, mx + 6.2, my + 0.5);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // 3.7 无缝连体软萌小肉手（根部融入身体，只描外侧 U 型轮廓，绝无贴纸感！）
+      [-1, 1].forEach((dir) => {
+        ctx.save();
+        let armX = dir * 56 + faceX * 0.2;
+        let armY = 23 + Math.sin(t * 2 + dir) * 1.8;
+        let armAngle = dir * 0.35;
+
+        if (isHappy) {
+          armX = dir * 58;
+          armY = 8 - Math.abs(Math.sin(t * 10)) * 6;
+          armAngle = dir * -0.55;
+        } else if (isHovered && dir === 1) {
+          armX = 59;
+          armY = 11;
+          armAngle = -0.48 + Math.sin(t * 7) * 0.22;
+        } else if (isSleeping) {
+          armX = dir * 48;
+          armY = 28;
+          armAngle = dir * 0.2;
+        }
+
+        ctx.translate(armX, armY);
+        ctx.rotate(armAngle);
+
+        // 先填充完整小肉掌柔和渐变
+        const armGrad = ctx.createRadialGradient(0, 0, 1, 0, 0, 14);
+        armGrad.addColorStop(0, '#ffffff');
+        armGrad.addColorStop(0.75, '#d1fae5');
+        armGrad.addColorStop(1, '#86efac');
+        ctx.fillStyle = armGrad;
+        ctx.beginPath();
+        ctx.ellipse(0, 0, 12, 8.5, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 仅描摹外侧 U 型弧线（内侧与身体无缝融为一体）
+        ctx.lineWidth = 2.2;
+        ctx.lineCap = 'round';
+        ctx.strokeStyle = '#065f46';
+        ctx.beginPath();
+        if (dir === 1) {
+          ctx.arc(0, 0, 10.5, -Math.PI * 0.42, Math.PI * 0.55);
+        } else {
+          ctx.arc(0, 0, 10.5, Math.PI * 0.45, Math.PI * 1.42);
+        }
+        ctx.stroke();
+        ctx.restore();
+      });
+
+      // 3.8 小憩模式的晶莹睡眠泡泡 + Zzz
+      if (isSleeping) {
+        ctx.save();
+        const bubbleR = 7.5 + Math.sin(t * 1.2) * 2.2;
+        const bx = faceX + 14;
+        const by = faceY + 2;
+        ctx.fillStyle = 'rgba(224, 242, 254, 0.45)';
+        ctx.strokeStyle = 'rgba(110, 231, 183, 0.8)';
+        ctx.lineWidth = 1.4;
+        ctx.beginPath();
+        ctx.arc(bx, by, bubbleR, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(bx - bubbleR * 0.35, by - bubbleR * 0.35, 1.8, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 飘浮的柔和 Z z
+        ctx.fillStyle = 'rgba(110, 231, 183, 0.78)';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillText('z', 44, -46 - Math.sin(t * 1.2) * 3);
+        ctx.font = 'bold 16px sans-serif';
+        ctx.fillText('Z', 56, -62 - Math.cos(t * 1.2) * 4);
+        ctx.restore();
+      }
+
+      ctx.restore(); // 结束角色主体变换
+
+      // 4. 环绕萤火微光粒子（前景）
+      fireflies.forEach((f) => {
+        const fx = cx + Math.cos(f.angle) * f.radius;
+        const fy = cy + f.yOffset + Math.sin(f.angle * 1.5 + f.phase) * 10;
+        const z = Math.sin(f.angle);
+        if (z >= 0) {
+          ctx.save();
+          const alpha = 0.45 + 0.35 * Math.sin(t * 2 + f.phase);
+          ctx.fillStyle = `rgba(167, 243, 208, ${alpha})`;
+          ctx.beginPath();
+          ctx.arc(fx, fy, f.size * 1.15, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+      });
+
+      // 5. 互动点击矢量粒子渲染
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vy -= 0.02;
+        p.alpha -= 0.022;
+        p.rot += 0.04;
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+        } else {
+          drawParticle(ctx, p);
+        }
+      }
+
+      requestAnimationFrame(render);
+    }
+
+    render();
+
+    function openMainWindow() {
+      if (window.liubendou && window.liubendou.showMain) {
+        window.liubendou.showMain();
+      }
+    }
+
+    function minimizePet() {
+      if (window.liubendou && window.liubendou.hidePet) {
+        window.liubendou.hidePet();
+      }
+    }
+
+    let isPinned = true;
+    function togglePin() {
+      isPinned = !isPinned;
+      const btn = document.getElementById('pinBtn');
+      btn.classList.toggle('active', isPinned);
+      if (window.liubendou && window.liubendou.setAlwaysOnTop) {
+        window.liubendou.setAlwaysOnTop(isPinned);
+      }
+    }
+
+    setTimeout(() => {
+      showBubble("把紧绷的肩膀放下来，我在听。", 4500);
+    }, 500);
+
+    setInterval(() => {
+      if (!isSleeping && !bubble.classList.contains('show')) {
+        nextQuote();
+      }
+    }, 90000);
+  </script>
+</body>
+
+</html>

@@ -1,0 +1,73 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: #07090c;
+    background-image:
+      radial-gradient(1100px 720px at 8% -12%, rgba(62, 211, 172, 0.10), transparent 62%),
+      radial-gradient(900px 640px at 96% 4%, rgba(240, 180, 41, 0.075), transparent 60%),
+      radial-gradient(760px 620px at 50% 108%, rgba(110, 231, 200, 0.05), transparent 62%);
+    color: #eef2f7;
+    font-feature-settings: 'ss01' on, 'cv01' on;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overflow: hidden;
+  }
+
+  ::selection {
+    background: rgba(110, 231, 200, 0.26);
+    color: #ffffff;
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.09);
+    border-radius: 999px;
+    border: 3px solid transparent;
+    background-clip: content-box;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.18);
+    background-clip: content-box;
+  }
+
+  textarea {
+    field-sizing: content;
+  }
+}
+
+@layer components {
+  .glass {
+    @apply border border-white/[0.07] bg-white/[0.028] backdrop-blur-2xl;
+  }
+
+  .hairline {
+    @apply border-white/[0.06];
+  }
+
+  .focus-ring {
+    @apply outline-none ring-0 transition focus-visible:ring-2 focus-visible:ring-mint-400/40;
+  }
+
+  .no-drag {
+    -webkit-app-region: no-drag;
+  }
+}
+
+.fade-mask {
+  mask-image: linear-gradient(to bottom, transparent, black 24px, black calc(100% - 24px), transparent);
+}
